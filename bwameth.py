@@ -23,6 +23,7 @@ from subprocess import check_call
 from operator import itemgetter
 from itertools import groupby, repeat, chain
 import re
+import shlex
 
 try:
     from itertools import izip
@@ -243,6 +244,14 @@ def rname(fq1, fq2=""):
     return "".join(a for a, b in zip(name(fq1), name(fq2)) if a == b) or 'bm'
 
 
+def shStringContains(s, x):
+    """Return True if the shell command string s contains the argument x
+    E.g.: shStringContains('foo -U 100', '-U') -> True
+    """
+    sList= shlex.split(s)
+    found= x in sList
+    return found
+
 def bwa_mem(fa, mfq, extra_args, prefix='bwa-meth', threads=1, rg=None,
             calmd=False, paired=True, set_as_failed=None):
     conv_fa = convert_fasta(fa, just_name=True)
@@ -253,11 +262,13 @@ def bwa_mem(fa, mfq, extra_args, prefix='bwa-meth', threads=1, rg=None,
         rg = '@RG\tID:{rg}\tSM:{rg}'.format(rg=rg)
 
     # penalize clipping and unpaired. lower penalty on mismatches (-B)
-    cmd = "|bwa mem -T 40 -B 2 -L 10 -CM "
+    cmd = "|bwa mem " + extra_args + " "
 
     if paired:
-        cmd += ("-U 100 -p ")
-    cmd += "-R '{rg}' -t {threads} {extra_args} {conv_fa} {mfq}"
+        cmd += "-p "
+        if not shStringContains(extra_args, '-U'):
+            cmd += '-U 100 ' 
+    cmd += "-R '{rg}' -t {threads} {conv_fa} {mfq}"
     cmd = cmd.format(**locals())
     sys.stderr.write("running: %s\n" % cmd.lstrip("|"))
     as_bam(cmd, fa, prefix, calmd, set_as_failed)
@@ -572,6 +583,9 @@ def main(args=sys.argv[1:]):
     p.add_argument("--reference", help="reference fasta", required=True)
     p.add_argument("-t", "--threads", type=int, default=6)
     p.add_argument("-p", "--prefix", default="bwa-meth")
+    p.add_argument("-x", "--extra_args", default= "-T 40 -B 2 -L 10 -CM",
+                   help= """String of additional args passed to bwa mem.
+                   Do not include here: -t, -R (Use explicit opt), -p (hardcoded). Default: '-T 40 -B 2 -L 10 -CM'""")
     p.add_argument("--calmd", default=False, action="store_true")
     p.add_argument("--read-group", help="read-group to add to bam in same"
             " format as to bwa: '@RG\\tID:foo\\tSM:bar'")
@@ -591,7 +605,7 @@ def main(args=sys.argv[1:]):
     # for the 2nd file. use G => A and bwa's support for streaming.
     conv_fqs_cmd = convert_fqs(args.fastqs)
 
-    bwa_mem(args.reference, conv_fqs_cmd, "", prefix=args.prefix,
+    bwa_mem(args.reference, conv_fqs_cmd, extra_args= args.extra_args, prefix=args.prefix,
              threads=args.threads, rg=args.read_group or
              rname(*args.fastqs), calmd=args.calmd,
              paired=len(args.fastqs) == 2,
@@ -604,7 +618,7 @@ def test():
     with tempfile.NamedTemporaryFile(delete=True) as rfh:
         prefix=rfh.name
         bwa_mem(ref, convert_fqs(("example/t_R1.fastq.gz",
-            "example/t_R2.fastq.gz")), "",
+            "example/t_R2.fastq.gz")), extra_args= "-T 40 -B 2 -L 10 -CM",
             prefix=rfh.name, threads=2, rg="ex", paired=True)
         assert op.exists("%s.bam" % prefix)
         assert op.exists("%s.bam.bai" % prefix)
