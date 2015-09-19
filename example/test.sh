@@ -101,5 +101,26 @@ count2=`samtools view -cF4 bwa-meth.bam`
 assert "$count2 -gt $count" $LINENO
 
 
+echo  -e "\nCan add custom extra arguments"
+# -----------------------------------
+rm -f bwa-meth.bam*
+python ../bwameth.py -x "-U 200 -T 30 -B 2 -L 20 -CM -k 8" --reference ref.fa t_R1.fastq.gz t_R2.fastq.gz 2> bwameth.log
+echo 'Is exit code 0?'
+if [[ "0" == "$?" ]]
+then
+    echo "PASS"
+else
+    echo "*** FAILED ***"
+fi
+
+extra=`grep 'bwa mem -U 200 -T 30 -B 2 -L 20 -CM -k 8 -p -R' bwameth.log`
+echo "bwa ran with extra args"
+if [[ $extra != "" ]]
+then
+    echo "PASS"
+else
+    echo "*** FAILED ***"
+fi
+rm bwameth.log
 
 echo "Success: ALL Tests PASS"
