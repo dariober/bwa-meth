@@ -584,7 +584,7 @@ def main(args=sys.argv[1:]):
     p.add_argument("-t", "--threads", type=int, default=6)
     p.add_argument("-p", "--prefix", default="bwa-meth")
     p.add_argument("-x", "--extra_args", default= "-T 40 -B 2 -L 10 -CM",
-                   help= """String of additional args passed to bwa mem.
+                   help= """String of additional args passed to bwa mem. Must always inlcude -C.
                    Do not include here: -t, -R (Use explicit opt), -p (hardcoded). Default: '-T 40 -B 2 -L 10 -CM'""")
     p.add_argument("--calmd", default=False, action="store_true")
     p.add_argument("--read-group", help="read-group to add to bam in same"
